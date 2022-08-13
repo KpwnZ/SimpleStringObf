@@ -80,8 +80,10 @@ struct StringObf : llvm::PassInfoMixin<StringObf> {
                          std::map<llvm::GlobalVariable *, llvm::GlobalVariable *> &mapEnc2Key) {
 
         std::vector<GlobalStringVariable> globalStrings;
-        std::uniform_int_distribution<uint8_t> distribution(0, 255);
-        std::default_random_engine generator;
+
+        static std::random_device device;
+        static std::mt19937 rng(device());
+        static std::uniform_int_distribution<std::mt19937::result_type> distribution(0, 0xff);
 
         for(auto &BB : F) {
             for (auto &inst : BB) {
@@ -117,7 +119,7 @@ struct StringObf : llvm::PassInfoMixin<StringObf> {
                         // generate xor key and encode the string
                         std::vector<uint8_t> enc_str, xor_key, ori;
                         for(size_t i = 0; i < len; ++i) {
-                            uint8_t key = distribution(generator);
+                            uint8_t key = distribution(rng);
                             ori.push_back(buf[i]);
                             xor_key.push_back(key);
                             enc_str.push_back(buf[i] ^ key);
@@ -193,7 +195,7 @@ struct StringObf : llvm::PassInfoMixin<StringObf> {
 
         }
     }
-
+};
 };
 
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
