@@ -43,7 +43,6 @@ bool isStringVariable(llvm::GlobalVariable *glob) {
 
     if (isa<llvm::ConstantDataArray>(initializer)) {
         auto arr = cast<llvm::ConstantDataArray>(initializer);
-        // llvm::errs() << arr->getAsString().begin() << "\n";
         if (arr->isString()) return true;
     }
     return false;
