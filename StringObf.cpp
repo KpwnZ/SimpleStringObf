@@ -37,13 +37,18 @@ bool isStringVariable(llvm::GlobalVariable *glob) {
     
     llvm::StringRef section = glob->getSection();
     if (section == "llvm.metadata") return false;
-
+    if (section == "__TEXT,__cstring,cstring_literals") {
+      return true;
+    }
     llvm::Constant *initializer = glob->getInitializer();
     if (!initializer) return false;
 
     if (isa<llvm::ConstantDataArray>(initializer)) {
         auto arr = cast<llvm::ConstantDataArray>(initializer);
-        if (arr->isString()) return true;
+        if (arr->isString()) {
+            llvm::errs() << arr->getAsString() << "\n";
+            return true;
+        }
     }
     return false;
 }
@@ -61,6 +66,23 @@ bool isStringLinkage(llvm::GlobalVariable *glob) {
         }
     }
     return false;
+}
+
+llvm::GlobalVariable *getStructString(llvm::GlobalVariable *glob) {
+    if (glob->hasExternalLinkage()) return nullptr;
+    if (!glob->hasInitializer()) return nullptr;
+    llvm::Constant *initializer = glob->getInitializer();
+
+    if (!isa<llvm::ConstantStruct>(initializer)) return nullptr;
+    auto *structVar = dyn_cast<llvm::ConstantStruct>(initializer);
+
+    for (auto &op : structVar->operands()) {
+        auto *g = dyn_cast<llvm::GlobalVariable>(op->stripPointerCasts());
+        if (g && isStringVariable(g)) {
+            return g;
+        }
+    }
+    return nullptr;
 }
 
 struct StringObf : llvm::PassInfoMixin<StringObf> {
@@ -112,6 +134,12 @@ struct StringObf : llvm::PassInfoMixin<StringObf> {
                                     }
                                 }
                             }
+                        } else if (auto *g = getStructString(glob)) {
+                            llvm::ConstantDataArray *arr = dyn_cast<llvm::ConstantDataArray>(g->getInitializer());
+                            buf = arr->getAsString().begin();
+                            len = arr->getAsString().size();
+                            glob = g;
+                            glob->setSection("");
                         }
                         if(!buf || !len) continue;
 
